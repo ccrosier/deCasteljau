@@ -1,7 +1,6 @@
 package org.openjfx;
 
 import javafx.application.Application;
-import javafx.event.EventHandler;
 import javafx.geometry.Orientation;
 import javafx.geometry.Point2D;
 import javafx.scene.Scene;
@@ -21,10 +20,11 @@ import org.ccrosie.spline.LineParametric;
 import java.util.*;
 
 /**
- * JavaFX App
+ * Visualization of de Casteljau's algorithm for Bezier curve point interpolation.
  */
 public class App extends Application {
 
+    // determines curve smoothness
     static double SAMPLE_RATE = 0.01;
 
     // UI Components
@@ -35,6 +35,10 @@ public class App extends Application {
     static Pane gridPlane = new Pane();
     static SceneState sceneState;
 
+    /**
+     * Create an interactive circle at the given point.
+     * @param point where to create
+     */
     public static void createCircle(Point2D point)
     {
         var c = new Circle(10);
@@ -42,12 +46,23 @@ public class App extends Application {
         c.setTranslateX(point.getX());
         c.setTranslateY(point.getY());
 
-        c.setOnMouseEntered(event -> {
-            c.setFill(Color.RED);
+        c.setOnDragEntered(_ -> {
+            c.setOnMouseMoved(event -> {
+                c.setCenterX(event.getX());
+                c.setCenterY(event.getY());
+                sceneState.controlPoints().remove(sceneState.controlCircles().get(c));
+                sceneState.controlCircles().put(c, new Point2D(event.getX(), event.getY()));
+            });
         });
-        c.setOnMouseExited(event -> {
+        c.setOnDragExited(_ -> c.setOnMouseMoved(_ -> {}));
+        c.setOnMouseEntered(_ -> {
+            c.setFill(Color.DARKCYAN);
+        });
+        c.setOnMouseExited(_ -> {
             c.setFill(Color.BLACK);
         });
+
+        sceneState.controlCircles().put(c, point);
         gridPlane.getChildren().add(c);
     }
 
@@ -64,18 +79,18 @@ public class App extends Application {
                         .map(d -> new Point2D(100+(Math.cos(Math.toRadians(d))+1)*100, 100+(Math.sin(Math.toRadians(d))+1)*100))
                         .toList());
 
-
         // initialize scene state
-        sceneState = new SceneState(points, slider.valueProperty().doubleValue(), showLines.isSelected());
+        sceneState = new SceneState(points, new HashMap<>(), slider.valueProperty().doubleValue(), showLines.isSelected());
+        sceneState.controlPoints().forEach(App::createCircle);
         drawScene();
 
         slider.addEventHandler(MouseEvent.ANY, _ -> {
-            sceneState = new SceneState(sceneState.controlPoints(), slider.getValue(), sceneState.drawLines());
+            sceneState = new SceneState(sceneState.controlPoints(), sceneState.controlCircles(), slider.getValue(), sceneState.drawLines());
             drawScene();
         });
 
         showLines.setOnAction(event -> {
-            sceneState = new SceneState(sceneState.controlPoints(), sceneState.u(), showLines.isSelected());
+            sceneState = new SceneState(sceneState.controlPoints(), sceneState.controlCircles(), sceneState.u(), showLines.isSelected());
             drawScene();
         });
 
@@ -86,6 +101,8 @@ public class App extends Application {
                     .stream().limit(de+1)
                     .map(d -> new Point2D(100+(Math.cos(Math.toRadians(d))+1)*100, 100+(Math.sin(Math.toRadians(d))+1)*100))
                     .toList());
+            sceneState.controlCircles().clear();
+            sceneState.controlPoints().forEach(App::createCircle);
             drawScene();
         });
 
@@ -104,8 +121,7 @@ public class App extends Application {
 
     static void drawScene()
     {
-        gridPlane.getChildren().clear();
-        sceneState.controlPoints().forEach(App::createCircle);
+        gridPlane.getChildren().removeIf(s -> !sceneState.controlCircles().containsKey(s));
         var curve = new Bezier(sceneState.controlPoints());
         gridPlane.getChildren()
                 .addAll(connectPoints(LinSpace.ofDoubles(0, sceneState.u(), SAMPLE_RATE)
@@ -118,6 +134,12 @@ public class App extends Application {
         }
     }
 
+    /**
+     * de Casteljau's algorithm
+     * @param controlPoints the Bézier curve
+     * @param u parametric parameter in [0, 1]
+     * @return shapes to add to scene that show the algorithm
+     */
     static List<Shape> decasteljau(List<Point2D> controlPoints, double u)
     {
         if (controlPoints.isEmpty())
@@ -149,6 +171,11 @@ public class App extends Application {
         return displayElements;
     }
 
+    /**
+     * Connect the given points with lines.
+     * @param points to connect
+     * @return lines connecting the points
+     */
     static List<LineParametric> connectPoints(List<Point2D> points)
     {
         if (points.size() <= 1)

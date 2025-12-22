@@ -33,7 +33,6 @@ public class App extends Application {
     static CheckBox showLines = new CheckBox("Show Lines");
     static Pane controlPane = new VBox(new HBox(new Label("U-Value"), slider), new HBox(new Label("Degree"), degreeDropDown, showLines));
     static Pane gridPlane = new Pane();
-    static final Circle[] selected = new Circle[1];
     static SceneState sceneState;
 
     public static void createCircle(Point2D point)
@@ -43,15 +42,6 @@ public class App extends Application {
         c.setTranslateX(point.getX());
         c.setTranslateY(point.getY());
 
-        // mouse selector
-        c.setOnMouseClicked(event ->
-        {
-            if (selected[0] != c)
-            {
-                selected[0] = c;
-                event.consume();
-            }
-        });
         c.setOnMouseEntered(event -> {
             c.setFill(Color.RED);
         });
@@ -69,33 +59,15 @@ public class App extends Application {
 
         // put points
         int deg = degreeDropDown.getValue();
-        List<Point2D> points = LinSpace.ofDoubles(0, 360, (double) 360 /(deg+1))
+        List<Point2D> points = new ArrayList<>(LinSpace.ofDoubles(0, 360, (double) 360 /(deg+1))
                         .stream().limit(deg+1)
                         .map(d -> new Point2D(100+(Math.cos(Math.toRadians(d))+1)*100, 100+(Math.sin(Math.toRadians(d))+1)*100))
-                        .toList();
+                        .toList());
 
 
         // initialize scene state
         sceneState = new SceneState(points, slider.valueProperty().doubleValue(), showLines.isSelected());
         drawScene();
-
-        EventHandler<MouseEvent> moveHandler =  event -> {
-            if (selected[0] != null)
-            {
-                selected[0].setTranslateX(event.getX());
-                selected[0].setTranslateY(event.getY());
-                drawScene();
-            }
-        };
-
-        // handle selection and movement
-        gridPlane.setOnMouseMoved(moveHandler);
-        gridPlane.setOnMouseClicked(event -> {
-            if (selected[0] != null)
-            {
-                selected[0] = null;
-            }
-        });
 
         slider.addEventHandler(MouseEvent.ANY, _ -> {
             sceneState = new SceneState(sceneState.controlPoints(), slider.getValue(), sceneState.drawLines());
@@ -125,7 +97,7 @@ public class App extends Application {
 
         var scene = new Scene(grid, 640, 480, Color.GRAY);
 
-        stage.setTitle("Decasteljau's Algorithm");
+        stage.setTitle("de Casteljau's Algorithm");
         stage.setScene(scene);
         stage.show();
     }

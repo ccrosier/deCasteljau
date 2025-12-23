@@ -34,11 +34,12 @@ public class App extends Application
     // UI Components
     static Slider slider = new Slider(0, 1, 0.5);
     static ChoiceBox<Integer> degreeDropDown = new ChoiceBox<>();
-    static CheckBox showLines = new CheckBox("Show Lines");
-    static Pane controlPane = new VBox(new HBox(new Label("U-Value"), slider), new HBox(new Label("Degree"), degreeDropDown, showLines));
+    static CheckBox showLines = new CheckBox("Show Interpolation");
+    static HBox controlPane = new HBox(new Label("U-Value"), slider, new Label("Degree"), degreeDropDown);
     static Pane gridPlane = new Pane();
     static SceneState sceneState;
-    static Circle selectedCircle;
+    @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
+    static Optional<Circle> selectedCircle = Optional.empty();
 
     /**
      * Create an interactive circle at the given point.
@@ -57,12 +58,12 @@ public class App extends Application
         {
             if (e.getButton() == MouseButton.PRIMARY)
             {
-                selectedCircle = c;
+                selectedCircle = Optional.of(c);
             }
         });
         c.setOnMouseEntered(_ ->
         {
-            c.setFill(Color.CYAN);
+            c.setFill(Color.DARKGREEN);
         });
         c.setOnMouseExited(_ ->
         {
@@ -121,35 +122,51 @@ public class App extends Application
         {
             if (e.getButton() == MouseButton.SECONDARY)
             {
-                selectedCircle = null;
+                selectedCircle = Optional.empty();
             }
         });
         gridPlane.setOnMouseMoved(event ->
         {
-            if (selectedCircle != null)
+            selectedCircle.ifPresent(circle ->
             {
                 // move control point in scene state
-                int idx = sceneState.controlPoints().indexOf(sceneState.controlCircles().get(selectedCircle));
+                int idx = sceneState.controlPoints().indexOf(sceneState.controlCircles().get(circle));
                 Point2D newPos = new Point2D(event.getX(), event.getY());
-                sceneState.controlCircles().put(selectedCircle, newPos);
+                sceneState.controlCircles().put(circle, newPos);
                 sceneState.controlPoints().add(idx, newPos);
                 sceneState.controlPoints().remove(idx + 1);
 
                 // move circle's on screen position
-                selectedCircle.setTranslateX(event.getX());
-                selectedCircle.setTranslateY(event.getY());
-            }
+                circle.setTranslateX(event.getX());
+                circle.setTranslateY(event.getY());
+            });
             drawScene();
         });
 
         // background color
         gridPlane.setBackground(new Background(new BackgroundFill(Color.BLACK, new CornerRadii(6), null)));
 
-        // fill vertical;
+        // help menu
+        var helpMenu = new Menu("Help");
+        var helpMessage = new MenuItem("Left-Click a point to select and move it around. Right-Click to deselect.");
+        helpMenu.getItems().add(helpMessage);
+
+        var aboutMenu = new Menu("About");
+        var aboutMessage = new MenuItem(
+                """
+                This program visualizes de Casteljau's algorithm for drawing points on Bezier curves.
+                You can draw curves of degree 2-5 but dragging points. To draw the whole curve, set
+                the U-slider to 1 (all the way to the right). To see de Casteljau's in action, make
+                sure to select "Show interpolation".
+                """);
+        aboutMenu.getItems().add(aboutMessage);
+
+        MenuBar menuBar = new MenuBar(aboutMenu, helpMenu);
+
+        controlPane.setSpacing(10);
 
         // layout
-        var sep = new Separator(Orientation.HORIZONTAL);
-        var vBox = new VBox(controlPane, sep, gridPlane);
+        var vBox = new VBox(menuBar, controlPane, showLines, new Separator(Orientation.HORIZONTAL), gridPlane);
         VBox.setVgrow(gridPlane,  Priority.ALWAYS);
 
         // fill horizontal
@@ -158,7 +175,6 @@ public class App extends Application
         vBox.setPrefHeight(Region.USE_COMPUTED_SIZE);
 
         var scene = new Scene(vBox, SCREEN_WIDTH, SCREEN_HEIGHT, Color.BLACK);
-
 
         stage.setTitle("de Casteljau's Algorithm");
         stage.setScene(scene);
@@ -207,6 +223,7 @@ public class App extends Application
         assert lines != null;
         var newControl = lines.stream().map(l -> l.at(u)).toList();
         List<Shape> displayElements = new ArrayList<>(lines.stream().map(LineParametric::l).map(a -> (Shape) a).toList());
+        displayElements.forEach(e -> e.setStroke(Color.RED)); // make the segments red
 
         newControl.forEach(p ->
         {

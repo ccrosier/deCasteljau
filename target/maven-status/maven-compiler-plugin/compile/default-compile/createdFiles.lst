@@ -1,6 +1,6 @@
 org/ccrosie/function/LinSpace.class
 org/openjfx/App.class
-org/openjfx/SystemInfo.class
 org/ccrosie/spline/LineParametric.class
+org/openjfx/SceneState.class
 module-info.class
 org/ccrosie/spline/Bezier.class
